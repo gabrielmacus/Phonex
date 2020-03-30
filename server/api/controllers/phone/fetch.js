@@ -16,35 +16,23 @@ const curl = require('curl');
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
 const async = require('async');
-
-function friendlyClean(word){
-	return quitarAcentos(word)
-	.replace(/^\s+|\s+$/g, "")//quito los espacios
-	.replace(/[_|\s]+/g, "-") // cambios los espacios y los guiones bajos por guiones
-	.replace(/[^a-z0-9-]+/g, "") // remuevo todos los caracteres que no son alfanumericos menos el guion
-	.replace(/[-]+/g, "-") // reemplazo varias instancias de un guion con una sola
-	.replace(/^-+|-+$/g, ""); // quito espacios entre los guiones
-}
-
-function quitarAcentos(word){
-	var originales = [/[Ã¡Ã Ã¤Ã¢]/g,/[Ã©Ã¨Ã«Ãª]/g,/[Ã­Ã¬Ã¯Ã®]/g,/[Ã³Ã²Ã¶Ã´]/g,/[ÃºÃ¹Ã¼Ã»]/g,/[Ã±]/g];
-	var reemplazos = ["a","e","i","o","u","n"];
-	var w=word.toLowerCase(); //hacemos todo en minuscula;
-	for (var i = 0; i < originales.length; i++) {
-		w = w.replace(originales[i],reemplazos[i]);
-	}
-	return w;
-}
+const slugify = require('slugify')
 
 module.exports = async function fetch(req, res) {
 
-  let number =  parseInt(req.param('number'));
+  let number =  req.param('number');
   let street = req.param('street');
-  let locality = 'entre-rios';//friendlyClean("Entre Rios");
+  let province = req.param('province')
   let endNumber = (Math.ceil(number/100)*100);
   let zip_code = req.param('zip_code');
 
-  console.log(number,endNumber)
+  number = parseInt(number);
+  province = slugify(province);
+
+  if(endNumber == number){
+    endNumber = endNumber + 100;
+  }
+
 
   let t = endNumber - number;
   let phone_numbers = [];
@@ -52,7 +40,7 @@ module.exports = async function fetch(req, res) {
   async.times(t, function(n, next) {
 
     let currentNumber = number + n
-    let url = `http://www.paginasblancas.com.ar/direccion/s/${friendlyClean(`${street}`)}-${currentNumber}/${locality}`;
+    let url = `http://www.paginasblancas.com.ar/direccion/s/${slugify(`${street} ${currentNumber}`)}/${slugify(province)}`;
     console.log(url)
     curl.get(url,(err, response, body)=>{
 
@@ -61,17 +49,17 @@ module.exports = async function fetch(req, res) {
 
       }
 
-      const dom = new JSDOM(body);
+    const dom = new JSDOM(body);
     let phone_numbers_dom = dom.window.document.querySelectorAll("[data-id]");
     phone_numbers_dom.forEach(el => {
         let phone_number = {
             name:el.querySelector(".m-results-business--name").innerHTML.replace(/(<([^>]+)>)/ig,"").trim().replace(/\s+/g,' '),
             phone_number:el.querySelector("[data-single-phone]").innerHTML.replace(/(<([^>]+)>)/ig,"").trim().replace(/\s+/g,' '),
             address:el.querySelector("[itemprop='streetAddress']").innerHTML.trim().replace(/\s+/g,' '),
-            locality:el.querySelector("[itemprop='addressLocality']").innerHTML.trim().replace(/\s+/g,' '),
+            province:el.querySelector("[itemprop='addressLocality']").innerHTML.trim().replace(/\s+/g,' '),
             zip_code:el.querySelector("[itemprop='addressLocality']").nextElementSibling.innerHTML.replace(/[^0-9]/g,"")
         };
-        if(phone_number.zip_codke == zip_code)
+        if(!zip_code || phone_number.zip_code == zip_code)
         phone_numbers.push(phone_number);
 
     });
