@@ -15,7 +15,7 @@ const puppeteer = require('puppeteer');
 const curl = require('curl');
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
-
+const async = require('async');
 
 function friendlyClean(word){
 	return quitarAcentos(word)
@@ -38,40 +38,47 @@ function quitarAcentos(word){
 
 module.exports = async function fetch(req, res) {
 
-  let number =  req.param('number');
+  let number =  parseInt(req.param('number'));
   let street = req.param('street');
   let locality = 'entre-rios';//friendlyClean("Entre Rios");
-  let endNumber = (Math.ceil(number/100)*100)-1;
+  let endNumber = (Math.ceil(number/100)*100);
+  let zip_code = req.param('zip_code');
+
+  console.log(number,endNumber)
 
   let t = endNumber - number;
   let phone_numbers = [];
 
-  async.times(10), function(n, next) {
+  async.times(t, function(n, next) {
 
-    let currentNumber = number + (n-1)
+    let currentNumber = number + n
     let url = `http://www.paginasblancas.com.ar/direccion/s/${friendlyClean(`${street}`)}-${currentNumber}/${locality}`;
+    console.log(url)
     curl.get(url,(err, response, body)=>{
 
       if(err){
-        return next(err);
+          return next(err);
 
       }
 
       const dom = new JSDOM(body);
-      let phone_numbers_dom = dom.window.document.querySelectorAll("[data-id]");
-      phone_numbers_dom.forEach(el => {
-        phone_numbers.push({
-          name:el.querySelector(".m-results-business--name").innerHTML.replace(/(<([^>]+)>)/ig,"").trim().replace(/\s+/g,' '),
-          phone_number:el.querySelector("[data-single-phone]").innerHTML.replace(/(<([^>]+)>)/ig,"").trim().replace(/\s+/g,' '),
-          address:el.querySelector("[itemprop='streetAddress']").innerHTML.trim().replace(/\s+/g,' '),
-          locality:el.querySelector("[itemprop='addressLocality']").innerHTML.trim().replace(/\s+/g,' '),
-          zip_code:el.querySelector("[itemprop='addressLocality']").nextElementSibling.innerHTML.replace(/[^0-9]/g,"")
-        })
-      });
+    let phone_numbers_dom = dom.window.document.querySelectorAll("[data-id]");
+    phone_numbers_dom.forEach(el => {
+        let phone_number = {
+            name:el.querySelector(".m-results-business--name").innerHTML.replace(/(<([^>]+)>)/ig,"").trim().replace(/\s+/g,' '),
+            phone_number:el.querySelector("[data-single-phone]").innerHTML.replace(/(<([^>]+)>)/ig,"").trim().replace(/\s+/g,' '),
+            address:el.querySelector("[itemprop='streetAddress']").innerHTML.trim().replace(/\s+/g,' '),
+            locality:el.querySelector("[itemprop='addressLocality']").innerHTML.trim().replace(/\s+/g,' '),
+            zip_code:el.querySelector("[itemprop='addressLocality']").nextElementSibling.innerHTML.replace(/[^0-9]/g,"")
+        };
+        if(phone_number.zip_codke == zip_code)
+        phone_numbers.push(phone_number);
 
-      next();
+    });
 
-    })
+    next();
+
+  })
 
 
   }, function(err) {
@@ -83,8 +90,6 @@ module.exports = async function fetch(req, res) {
       return res.json(phone_numbers);
   });
 
-
-  console.log(url);
 
 
 
