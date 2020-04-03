@@ -13,7 +13,7 @@
           @click="leftDrawerOpen = !leftDrawerOpen"
         />-->
 
-        <q-toolbar-title >
+        <q-toolbar-title align="center" >
           Phonex
         </q-toolbar-title>
         <!--

@@ -28,7 +28,7 @@ module.exports.sockets = {
   ***************************************************************************/
 
   // transports: [ 'websocket' ],
-
+   onlyAllowOrigins: ["http://localhost:8080","http://ec2-54-207-43-177.sa-east-1.compute.amazonaws.com"]
 
   /***************************************************************************
   *                                                                          *

@@ -69,6 +69,13 @@ module.exports = function (ctx) {
 
       // https://quasar.dev/quasar-cli/cli-documentation/handling-webpack
       extendWebpack (cfg) {
+      },
+      env: ctx.dev
+      ? { // so on dev we'll have
+        API_URL: JSON.stringify('http://localhost:1337')
+      }
+      : { // and on build (production):
+        API_URL: JSON.stringify('http://ec2-54-207-43-177.sa-east-1.compute.amazonaws.com:1337')
       }
     },
 
