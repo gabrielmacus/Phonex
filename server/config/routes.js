@@ -33,6 +33,7 @@ module.exports.routes = {
   *                                                                          *
   ***************************************************************************/
 
-  '/phone/': 'phone/fetch'
+  'GET /phone/': 'phone/fetch',
+  'GET /phone/spreadsheet/:spreadsheetId': 'phone/write-to-spreadsheet'
 
 };

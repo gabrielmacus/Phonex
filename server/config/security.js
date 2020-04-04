@@ -30,7 +30,7 @@ module.exports.security = {
 
   cors: {
     allRoutes: true,
-    allowOrigins: ['http://localhost:8080','http://ec2-54-207-43-177.sa-east-1.compute.amazonaws.com']
+    allowOrigins: ['http://localhost:8080','http://localhost:1337','http://ec2-54-207-43-177.sa-east-1.compute.amazonaws.com']
   },
 
   /****************************************************************************

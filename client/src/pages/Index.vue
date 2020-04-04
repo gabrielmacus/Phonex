@@ -24,9 +24,15 @@
             </div>
 
 
-            <div class="col-12 q-mb-md">
+            <div class="col-12 ">
               <q-input required v-model="query.zip_code" hint="Ej: 3100" label="Código postal" />
             </div>
+
+            <div class="col-12 q-mb-md">
+              <q-input   v-model="query.spreadsheetUrl" label="Link Google Sheets (opcional)" hint="Hoja de cálculo de Google a donde volcar los datos" />
+            </div>
+
+
 
             <div class="col-12">
                     <q-btn type="submit" :loading="loading"  label="Buscar" class="full-width" color="primary" icon-right="search" />
@@ -143,6 +149,9 @@ export default {
       phones:[/*{"name":"Rosenbrock Dario D","phone_number":"(343) 442 - 4758","address":"Gran Chaco 7","province":"Entre Rios","zip_code":"3100"}*/
       ],
       query:{
+        spreadsheetUrl:this.$route.query.spreadsheetUrl,
+        spreadsheetId:"",
+        spreadsheetSheet:"0",
         province:this.$route.query.province,
         zip_code:this.$route.query.zip_code,
       }
@@ -153,6 +162,20 @@ export default {
       this.$set(this.visiblePhones,number,true);
     },
     async makeSearch(){
+
+      if(this.query.spreadsheetUrl && !this.query.spreadsheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)){
+        Notify.create({type:'negative',timeout:3500, message:`Ingrese la url de Google Sheets correctamente`,actions: [{ color:'white',icon: 'close' }]});
+        return ;
+      }
+
+      if(this.query.spreadsheetUrl){
+        this.query.spreadsheetId = this.query.spreadsheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/,"")[1];
+
+        //Si tiene una hoja en particular la url la extraigo
+        if(this.query.spreadsheetUrl.match(/[#&]gid=([0-9]+)/))
+        this.query.spreadsheetSheet = this.query.spreadsheetUrl.match(/[#&]gid=([0-9]+)/)[1];
+      }
+
       if(this.closeNoResultsNotification)
       {
         this.closeNoResultsNotification();
@@ -166,15 +189,62 @@ export default {
 
       this.loading = true;
       this.phones = [];
-      pump(
-        hyperquest(`${process.env.API_URL}/phone?street=${this.query.street}&start_number=${this.query.start_number}&end_number=${this.query.end_number}&zip_code=${this.query.zip_code}&province=${this.query.province}`),
+
+
+      let request = hyperquest(`${process.env.API_URL}/phone?street=${this.query.street}&start_number=${this.query.start_number}&end_number=${this.query.end_number}&zip_code=${this.query.zip_code}&province=${this.query.province}&spreadsheetId=${this.query.spreadsheetId}&spreadsheetSheet=${this.query.spreadsheetSheet}`);
+
+      request
+      .pipe(ndjson.parse())
+      .pipe(through.obj((row,enc,next)=>{
+
+        if(row.phone_number)
+        {
+          this.phones.push(row);
+        }
+        else {
+          if(!this.phones.length){
+            this.closeNoResultsNotification = Notify.create({
+            message:"No se encontraron resultados. Recuerde escribir el nombre de la calle de forma simplificada",
+            text:'white',
+            actions: [{ color:'white',icon: 'close' }]})
+          }
+          else {
+            Notify.create({type:'positive',timeout: 2500,message:`${this.phones.length} resultados encontrados`});
+          }
+          this.loading=false;
+          if(row.error && !row.type) {
+              Notify.create({type:'negative',timeout: 2500,message:`Hubo un error al procesar uno o más resultados. Inténte buscar nuevamente`});
+          }
+          else if(row.error && row.type == 'spreadsheet-error'){
+              Notify.create({type:'negative',timeout: 5000,message:`Error al guardar los datos en Google Sheets. Verifique que la hoja exista y que tenga los permisos correspondientes`});
+          }
+        }
+        next()
+      }))
+
+      request.on('end',(e)=>{
+        console.log("");
+      });
+      /*
+       pump(
+
+        hyperquest(`${process.env.API_URL}/phone?street=${this.query.street}&start_number=${this.query.start_number}&end_number=${this.query.end_number}&zip_code=${this.query.zip_code}&province=${this.query.province}&spreadsheetId=${this.query.spreadsheetId}&spreadsheetSheet=${this.query.spreadsheetSheet}`),
         ndjson.parse(),
         through.obj((row, enc, next)=>{
+
+
+        console.log(row);
+
           //let idx = this.phones.findIndex()
-          this.phones.push(row);
-          next()
+          if(row.phone_number)
+          {
+            this.phones.push(row);
+          }
+
+          next(row)
         }),
         ()=>{
+
           if(!this.phones.length){
             this.closeNoResultsNotification = Notify.create({
             message:"No se encontraron resultados. Recuerde escribir el nombre de la calle de forma simplificada",
@@ -186,7 +256,7 @@ export default {
           }
           this.loading=false;
         }
-      )
+      )*/
 
 
       /*
