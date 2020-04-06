@@ -25,7 +25,7 @@
 
 
             <div class="col-12 ">
-              <q-input required v-model="query.zip_code" hint="Ej: 3100" label="Código postal" />
+              <q-input  required v-model="query.zip_code" hint="Ej: 3100" label="Código postal" />
             </div>
 
             <div class="col-12 q-mb-md">
@@ -35,7 +35,7 @@
 
 
             <div class="col-12">
-                    <q-btn type="submit" :loading="loading"  label="Buscar" class="full-width" color="primary" icon-right="search" />
+                    <q-btn type="submit" :loading="loading"  label="Buscar"  class="full-width" color="primary" icon-right="search" />
             </div>
 
               <!--
@@ -68,9 +68,32 @@
           <span class="address">{{phone.address}}</span>
         </div>
         <div class="section">
-          <span class="show-phone" v-if="!visiblePhones[phone.phone_number]"><q-btn size="sm" @click="setVisiblePhone(phone.phone_number)" color="green" round   icon="phone"  /></span>
+          <span class="show-phone" v-if="!phone.phone_number_shown"><q-btn size="sm" @click="setVisiblePhone(phone)" color="green" round   icon="phone"  /></span>
           <span class="phone-number text-primary" v-else>{{phone.phone_number}}</span>
         </div>
+
+        <div class="section q-mt-md">
+          <q-select @input="phoneDataChanged(phone,0)"
+                    standout="bg-grey-7"
+                    map-options
+                    emit-value
+                    v-model="phone.status"
+                    :options="statusOptions"
+                    placeholder="Estado" >
+          </q-select>
+        </div>
+
+        <div class="section q-mt-md">
+          <q-input
+                  placeholder="Observaciones"
+                  @input="phoneDataChanged(phone,3000)"
+                  v-model="phone.details"
+                  filled
+                  autogrow
+          />
+        </div>
+
+
       </div>
 
       <div v-if="loading" class="q-pa-md bg-grey-3">
@@ -124,6 +147,10 @@
       display: grid;
           grid-template-columns: 1fr auto;
       padding: 1rem;
+
+      .section:nth-child(3),.section:nth-child(4){
+        grid-column: 1 / span 2
+      }
     }
   }
 </style>
@@ -142,8 +169,52 @@ export default {
   name: 'PageIndex',
   data(){
     return {
+      //changedPhones:{},
+      saveTimeouts:{},
+      statusOptions:[
+          {
+              label: 'Sin registro',
+              value: 0,
+          },
+          {
+              label: 'Atendió',
+              value: 1,
+          },
+          {
+              label: 'Llamar en otro momento',
+              value: 2,
+          },
+          {
+              label: 'No llamar',
+              value: 3,
+          },
+          {
+              label: 'No contesta',
+              value: 4,
+          },
+          {
+              label: 'Contestador',
+              value: 5,
+          },
+          {
+              label: 'Fue llamado',
+              value: 6,
+          }
+          ,
+          {
+              label: 'Revisita',
+              value: 7,
+          },
+          {
+              label: 'Fuera de servicio',
+              value: 8,
+          },
+
+
+
+      ],
       searchLimit: 300,
-      visiblePhones:{},
+      //visiblePhones:{},
       visibleSearch:true,
       loading:false,
       phones:[/*{"name":"Rosenbrock Dario D","phone_number":"(343) 442 - 4758","address":"Gran Chaco 7","province":"Entre Rios","zip_code":"3100"}*/
@@ -157,9 +228,113 @@ export default {
       }
     }
   },
+  mounted(){
+
+  },
   methods: {
-    setVisiblePhone(number){
-      this.$set(this.visiblePhones,number,true);
+    async phoneDataChanged(phone,saveDelay){
+
+        if(this.saveTimeouts[phone.phone_number])
+        {
+         clearTimeout(this.saveTimeouts[phone.phone_number]);
+        }
+        this.saveTimeouts[phone.phone_number] = setTimeout(async ()=>{
+            try {
+
+                let response;
+                if(phone.id){
+                    response = await axios.patch(`${process.env.API_URL}/phone/${phone.id}`, phone);
+                }
+                else {
+                    response = await axios.post(`${process.env.API_URL}/phone`, phone);
+                }
+
+                let idx = this.phones.findIndex((el)=>{return el.phone_number == phone.phone_number});
+
+                if(idx > -1)
+                {
+                    this.$set(this.phones[idx],'id',response.data.id);
+                    this.$set(this.phones[idx],'status',response.data.status);
+                    this.$set(this.phones[idx],'details',response.data.details);
+                }
+
+                Notify.create({
+                    type:'positive',
+                    message:'Cambios guardados correctamente',
+                    timeout:3000
+                });
+            }
+            catch (err)
+            {
+                console.log(err);
+                Notify.create({
+                    type:'negative',
+                    message:'Error al guardar los cambios. Reinténtelo nuevamente',
+                    timeout:1500
+                });
+            }
+            delete this.saveTimeouts[phone.phone_number];
+        },saveDelay);
+
+        /*
+        if(this.phoneStatusChangedTimeout){
+            clearTimeout(this.phoneStatusChangedTimeout);
+        }
+
+        this.$set(this.changedPhones,phone.phone_number,phone);
+
+        this.phoneStatusChangedTimeout = setTimeout(async ()=>{
+            try {
+
+                for(const phone of Object.values(this.changedPhones)){
+                    let response;
+                    if(phone.id){
+                        response = await axios.put(`${process.env.API_URL}/phone/${phone.id}`, phone);
+                    }
+                    else {
+                        response = await axios.post(`${process.env.API_URL}/phone`, phone);
+                    }
+
+                    let idx = phones.findIndex((el)=>{return el.phone_number == phone.phone_number});
+                    this.$set(this.phones[idx],'id',response.data.id);
+                }
+
+                Notify.create({
+                    type:'positive',
+                    message:'Cambios guardados correctamente',
+                    timeout:3000
+                });
+                this.changedPhones = {};
+            }
+            catch (err)
+            {
+                console.log(err);
+                Notify.create({
+                    type:'negative',
+                    message:'Error al guardar los cambios. Reinténtelo nuevamente',
+                    timeout:3000
+                })
+            }
+        },3000);*/
+    },
+
+    async loadPhonesData(){
+        this.loading = true;
+        let phone_numbers = this.phones.map((phone)=>{return phone.phone_number});
+        let url = `${process.env.API_URL}/phone/?where={"phone_number":{"in":${JSON.stringify(phone_numbers)}}}`;
+        let response = await axios.get(url);
+
+        response.data.forEach((phone)=>{
+            let idx = this.phones.findIndex((el)=>{return el.phone_number == phone.phone_number; });
+            this.$set(this.phones,idx,phone);
+        });
+        this.loading = false;
+    },
+    setVisiblePhone(phone){
+
+      phone.phone_number_shown = true;
+      this.phoneDataChanged(phone,0);
+      //this.$set(this.visiblePhones,phone.phone_number,true);
     },
     async makeSearch(){
 
@@ -191,15 +366,32 @@ export default {
       this.phones = [];
 
 
-      let request = hyperquest(`${process.env.API_URL}/phone?street=${this.query.street}&start_number=${this.query.start_number}&end_number=${this.query.end_number}&zip_code=${this.query.zip_code}&province=${this.query.province}&spreadsheetId=${this.query.spreadsheetId}&spreadsheetSheet=${this.query.spreadsheetSheet}`);
+      let request = hyperquest(`${process.env.API_URL}/phone/search?street=${this.query.street}&start_number=${this.query.start_number}&end_number=${this.query.end_number}&zip_code=${this.query.zip_code}&province=${this.query.province}&spreadsheetId=${this.query.spreadsheetId}&spreadsheetSheet=${this.query.spreadsheetSheet}`);
 
       request
       .pipe(ndjson.parse())
-      .pipe(through.obj((row,enc,next)=>{
+      .pipe(through.obj(async (row,enc,next)=>{
 
         if(row.phone_number)
         {
+          //row.status = !row.status ? 0 : row.status;
+
+          try{
+              //
+              let response = await axios.get(`${process.env.API_URL}/phone/?phone_number=${row.phone_number}`);
+              if(response.data.length)
+              {
+                  row = response.data[0];
+              }
+          }
+          catch (err)
+          {
+
+          }
+            row.status = !row.status ? 0 : row.status;
+
           this.phones.push(row);
+
         }
         else {
           if(!this.phones.length){
@@ -212,12 +404,14 @@ export default {
             Notify.create({type:'positive',timeout: 2500,message:`${this.phones.length} resultados encontrados`});
           }
           this.loading=false;
+
           if(row.error && !row.type) {
               Notify.create({type:'negative',timeout: 2500,message:`Hubo un error al procesar uno o más resultados. Inténte buscar nuevamente`});
           }
           else if(row.error && row.type == 'spreadsheet-error'){
               Notify.create({type:'negative',timeout: 5000,message:`Error al guardar los datos en Google Sheets. Verifique que la hoja exista y que tenga los permisos correspondientes`});
           }
+
         }
         next()
       }))
